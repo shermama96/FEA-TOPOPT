@@ -56,27 +56,6 @@ class setup():
         v = self.domain.pRatio
         return (E/(1 - v**2))*np.array(([1, v, 0], [v, 1, 0], [0, 0, .5*(1 - v)]))
     
-    # def gaussQuad(self, element):
-    #     if len(element.packageNodes()) == 4:
-    #         ptMag = 1/np.sqrt(3)
-    #         gaussWeights = np.ones(4)
-    #         gaussPoints = np.array([[-ptMag, -ptMag], [-ptMag, ptMag], [ptMag, -ptMag], [ptMag, ptMag]])
-    #         element.setGauss(gaussPoints, gaussWeights)
-    #     else:
-    #         ValueError("No Gauss Point configuration for an element with", len(self.mesh.getElement(1).packageNodes()), "nodes")
-            
-    # def buildShapeMatrix(self, gaussPoints):
-    #     if len(self.packageNodes()) == 4:
-    #         res = .25*np.array([[(1 - gaussPoints[0])*(1 - gaussPoints[1]), (1 + gaussPoints[0])*(1 - gaussPoints[1])],\
-    #                             [(1 + gaussPoints[0])*(1 + gaussPoints[1]), (1 - gaussPoints[0])*(1 + gaussPoints[1])]])
-    #     return res
-    
-    # def buildShapeDerivMatrix(self, gaussPoints):
-    #     if len(self.packageNodes()) == 4:
-    #         res = .25*np.array([[-(1 - gaussPoints[1]), (1 - gaussPoints[1]), (1 + gaussPoints[1]), -(1 + gaussPoints[1])],\
-    #                             [-(1 - gaussPoints[0]), -(1 + gaussPoints[0]), (1 + gaussPoints[0]), (1 - gaussPoints[0])]])
-    #     return res
-    
     def localConstruction(self, element):
         nodalCoords = element.packageNodalCoords()
         element.localStiffMat = np.zeros((8,8))
@@ -88,26 +67,9 @@ class setup():
             bMat = quadBMatrix(jacobian, derivShapeMat)
             transdormedCoords = shapeMat@nodalCoords
             
-            # THE FUCKING B MATRIX IS WRONG CHECK THE BOOK
             tempStiff = (bMat.T @ self.elastConstMat() @ bMat)*element.gaussWeights[idx]*npl.det(jacobian)
             element.localStiffMat = element.localStiffMat + tempStiff
             idx += 1
-    
-    
-    
-        # NofXiEta=Nmatrix(qp(iqp,:),nnpe); % row vector of shape functions
-    #                                   % at this QP in parent domain
-    # dNdXiEta=dNmatrix(qp(iqp,:),nnpe);% 2xnnpe array of shape func derivs
-    #                                   % at this QP in parent domain
-    # JofXiEta=dNdXiEta*[xvec,yvec];    % jacobian at this QP (2x2 matrix)
-    # B=inv(JofXiEta)*dNdXiEta;         % 2xnnpe array of dNdX at ths QP
-    
-    # XY=NofXiEta*[xvec,yvec]; % physical coordinate of this QP (1x2)
-    
-    # % add the weighted contributions of this QP to the elemental stiffness
-    # % matrix and elemental body force vector
-    # ke=ke+(B'*DD(XY)*B)*w(iqp)*det(JofXiEta);
-    # fe=fe+(FF(XY)*NofXiEta')*w(iqp)*det(JofXiEta);
     
     def globalAssembly(self):
         for el in list(itertools.chain(*self.mesh.elements)):
