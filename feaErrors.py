@@ -14,3 +14,6 @@ class InvalidMeshConfig(Error):
 
 class ElementOutOfBoundsError(Error):
     pass
+
+class InvalidBCTypeError(Error):
+    pass

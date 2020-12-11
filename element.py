@@ -19,9 +19,12 @@ class element():
         self.xLength = xLength
         self.yLength = yLength
         self.localStiffMat = []
-        self.localForceMat = []
+        self.localForceVector = []
+        self.BC = []
+        self.boundaryId = None
+        self.traction = np.array([0, 0])
         
-    
+        
     def setLocalNodes(self, numOfXElems, numOfYElems):
         normalizedId = self.Id/numOfXElems
         if normalizedId%1 == 0:
@@ -29,10 +32,18 @@ class element():
         else:
             rowIdx = numOfYElems - mt.floor(normalizedId)
         
-        self.BLnode = node(self.Id + (numOfYElems - rowIdx), self.calcNodalCoords(1))
-        self.BRnode = node(self.BLnode.globalNodeNumber + 1, self.calcNodalCoords(2))
-        self.TLnode = node(self.BLnode.globalNodeNumber + (numOfXElems + 1), self.calcNodalCoords(4))
-        self.TRnode = node(self.TLnode.globalNodeNumber + 1, self.calcNodalCoords(3))
+        BLid = self.Id + (numOfYElems - rowIdx)
+        self.BLnode = node(BLid, [2*BLid - 1, 2*BLid], self.calcNodalCoords(1))
+        
+        BRid = self.BLnode.globalNodeNumber + 1
+        self.BRnode = node(BRid, [2*BRid - 1, 2*BRid], self.calcNodalCoords(2))
+        
+        TLid = self.BLnode.globalNodeNumber + (numOfXElems + 1)
+        self.TLnode = node(TLid, [2*TLid - 1, 2*TLid], self.calcNodalCoords(4))
+        
+        TRid = self.TLnode.globalNodeNumber + 1
+        self.TRnode = node(TRid, [2*TRid - 1, 2*TRid], self.calcNodalCoords(3))
+        
         
     def calcNodalCoords(self, localIndex):
          xCoord = self.meshIndices[1] * self.xLength
@@ -51,7 +62,22 @@ class element():
     def packageNodes(self):
         return [self.BLnode, self.BRnode, self.TRnode, self.TLnode]
     
-    def setGauss(self, gaussPoints, gaussWeights):
+    def packageDOFs(self, offSet=True):
+        temp = []
+        for n in self.packageNodes():
+            if offSet == True:
+                temp.extend([n.xDOF - 1, n.yDOF - 1])
+            else:
+                temp.extend([n.xDOF, n.yDOF])
+        return temp
+    
+    def setGauss(self):
+        if len(self.packageNodes()) == 4:
+            ptMag = 1/np.sqrt(3)
+            gaussWeights = np.ones(4)
+            gaussPoints = np.array([[-ptMag, -ptMag], [-ptMag, ptMag], [ptMag, -ptMag], [ptMag, ptMag]])
+        else:
+            raise(ValueError("No Gauss Point configuration for an element with", len(element.packageNodes()), "nodes"))
         self.gaussPoints = gaussPoints
         self.gaussWeights = gaussWeights
         
@@ -68,6 +94,38 @@ class element():
         for i in self.packageNodes():
             coordMat.append(np.array([i.xCoord, i.yCoord]))
         return np.array(coordMat)
+    
+    # TODO
+    # CHANGE SO FUNCTION BELOW ACTUALLY LOOKS FOR SPECIFIC BCS IN LIST
+    
+    def boundaryShapeFunction(self):
+        try:
+            if self.BC[0].edgeID == "top":
+                N1, N2, N3, N4 = 0, 0, 1, 1
+            elif self.BC[0].edgeID == "bottom":
+                N1, N2, N3, N4 = 1, 1, 0, 0
+            elif self.BC[0].edgeID == "right":
+                N1, N2, N3, N4 = 1, 0, 0, 1
+            elif self.BC[0].edgeID == "left":
+                N1, N2, N3, N4 = 0, 1, 1, 0
+                
+            primary = [N1, 0, N2, 0, N3, 0, N4]
+            return np.array([primary + [0], [0] + primary]).T
+        except AttributeError:
+            print("Oops, this element is either not on a boundary or has no BC assigned to it!")
+            
+    def prescribeDefaultTractions(self):
+        for edge in self.boundaryId():
+            if edge == "top":
+                None
+            elif edge == "bottom":
+                None
+            elif edge == "left":
+                None
+            elif edge == "right":
+                None
+            else:
+                None
             
         
         

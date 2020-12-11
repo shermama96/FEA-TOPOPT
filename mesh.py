@@ -7,10 +7,16 @@ Created on Tue Nov 17 14:25:35 2020
 import feaErrors
 import numpy as np
 from element import element
-
+from collections import Counter
 from node import node
 import itertools
 
+# TODO
+# USE GRAVITY
+
+def setBoundaryIDs(boundaryElements, boundaryId):
+    for el in boundaryElements:
+        el.boundaryID = boundaryId
 
 class mesh():
     
@@ -18,12 +24,18 @@ class mesh():
         self.elements = []
         self.numOfNodes = None
         self.numOfEls = None
-        self.DOFs = None
+        self.totalDOFs = None
         self.meshConfig = {}
         self.nodesPerEl = 4
         self.conMatrix = []
-        self.isBoundary = None
-      
+        self.boundary = []
+        self.bottomBoundary  = []
+        self.rightBoundary = []
+        self.topBoundary = []
+        self.leftBoundary = []
+        self.elementalMass = None
+        self.nodeDict = {}
+        
     def checkConfig(self):
         if self.meshConfig["meshType"] != "asPerc" and self.meshConfig["meshType"] != "NpE":
             raise feaErrors.InvalidMeshConfig("Entered invalid mesh type!")  
@@ -36,8 +48,7 @@ class mesh():
             
         elif len(self.meshConfig) == 0:
             raise feaErrors.InvalidMeshConfig("You can not generate the mesh before configuring the mesh!")
-      
-        
+    
       
     def configMesh(self, xFactor=0.05, yFactor=0.05, meshType="asPerc"):
         '''
@@ -84,6 +95,7 @@ class mesh():
         tempRow = []
         xLength = domain.length/self.numOfXElems
         yLength = domain.height/self.numOfYElems
+        self.elementalMass = xLength*yLength*domain.depth*domain.density
         rowIdx = self.numOfYElems - 1
         colIdx = self.numOfXElems - 1
         for i in range(1, self.numOfEls + 1):
@@ -96,10 +108,30 @@ class mesh():
                 tempRow = []
             
                 
-    def assignNodesToElements(self):
+    def assignElementValues(self):
         for el in list(itertools.chain(*self.elements)):
             el.setLocalNodes(self.numOfXElems, self.numOfYElems)
+            el.setGauss()
     
+    def extractBoundaryElements(self):
+        self.bottomBoundary = self.elements[0]
+        setBoundaryIDs(self.bottomBoundary, "bottom")
+        self.topBoundary = self.elements[-1]
+        setBoundaryIDs(self.topBoundary, "top")
+        for i in range(self.numOfYElems):
+            self.leftBoundary.append(self.elements[i][0])
+            self.rightBoundary.append(self.elements[i][-1])
+        setBoundaryIDs(self.leftBoundary, "left")
+        setBoundaryIDs(self.rightBoundary, "right")
+        self.boundary = list(set(self.bottomBoundary + self.rightBoundary + self.topBoundary + self.leftBoundary))
+        
+    def nodeDofDictionary(self):
+        for el in list(itertools.chain(*self.elements)):
+            for n in el.packageNodes():
+                self.nodeDict[n.xDOF] = n
+                self.nodeDict[n.yDOF] = n
+            
+        
 
     def generateMesh(self, domain):
         if self.meshConfig["meshType"] == "asPerc":
@@ -109,11 +141,12 @@ class mesh():
             self.numOfYElems = self.meshConfig["yFactor"]
         
         self.numOfEls = self.numOfXElems*self.numOfYElems
-        self.numOfNodes = self.numOfEls*self.nodesPerEl
-        self.DOFs = self.numOfNodes*3 # CHECK CHECK CHECK    
+        self.numOfNodes = (self.numOfXElems + 1) * (self.numOfYElems + 1)
+        self.totalDOFs = self.numOfNodes*2 # CHECK CHECK CHECK    
         self.generateElements(domain)   
-        self.assignNodesToElements()
+        self.assignElementValues()
         self.buildConnectMat()
+        self.extractBoundaryElements()
     
                 
         
